@@ -5,4 +5,5 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [com.github.seancorfield/next.jdbc "1.3.894"]]
+  :profiles {:dev {:dependencies [[org.postgresql/postgresql "9.4.1208.jre7"]]}}
   :repl-options {:init-ns com.github.jimpil.dblocks.core})

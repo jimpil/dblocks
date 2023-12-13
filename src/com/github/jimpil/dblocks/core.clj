@@ -1,8 +1,8 @@
 (ns com.github.jimpil.dblocks.core
-  (:require [com.github.jimpil.dblocks.session     :as session]
+  (:require [com.github.jimpil.dblocks.session :as session]
             [com.github.jimpil.dblocks.transaction :as transaction]
-            ;[com.github.jimpil.dblocks.util        :as util]
-            )
+    ;[com.github.jimpil.dblocks.util        :as util]
+            [next.jdbc :as jdbc])
   (:import  [java.util.concurrent ThreadLocalRandom TimeUnit]
             [java.util.concurrent.locks Lock]))
 
@@ -35,56 +35,56 @@
 
 (defmacro with-session-lock
   "Executes <body> inside an exclusive session-level advisory lock (per <lock-id>), 
-   waiting if necessary. Releases the lock at the end (explicitely)."
+   waiting if necessary. Releases the lock at the end (explicitly)."
   [db lock-id & body]
-  `(let [db# ~db
-         id# (id-from ~lock-id)]
-     (when (session/acquire-lock! db# id#)
-       (try ~@body
-            (finally
-              (session/release-lock! db# id#))))))
+  `(let [id# (id-from ~lock-id)]
+     (with-open [conn# (jdbc/get-connection ~db)]
+       (when (session/acquire-lock! conn# id#)
+         (try ~@body
+              (finally
+                (session/release-lock! conn# id#)))))))
 
 (defmacro with-session-try-lock
   "Executes <body> inside an exclusive session-level advisory lock (per <lock-id>), 
-   if available. Releases the lock at the end (explicitely)."
+   if available. Releases the lock at the end (explicitly)."
   [db lock-id & body]
-  `(let [db# ~db
-         id# (id-from ~lock-id)]
-     (when (session/try-acquire-lock! db# id#)
-       (try ~@body
-            (finally
-              (session/release-lock! db# id#))))))
+  `(let [id# (id-from ~lock-id)]
+     (with-open [conn# (jdbc/get-connection ~db)]
+       (when (session/try-acquire-lock! conn# id#)
+         (try ~@body
+              (finally
+                (session/release-lock! conn# id#)))))))
 
 (defmacro with-session-try-lock-timeout
   "Executes <body> inside an exclusive session-level advisory lock (per <lock-id>), 
-   waiting up to <timeout> seconds. Releases the lock at the end (explicitely)."
+   waiting up to <timeout> seconds. Releases the lock at the end (explicitly)."
   [db lock-id timeout & body]
-  `(let [db# ~db
-         id# (id-from ~lock-id)]
-     (when (session/try-acquire-lock-with-timeout! db# id# ~timeout)
-       (try ~@body
-            (finally
-              (session/release-lock! db# id#))))))
+  `(let [id# (id-from ~lock-id)]
+     (with-open [conn# (jdbc/get-connection ~db)]
+       (when (session/try-acquire-lock-with-timeout! conn# id# ~timeout)
+         (try ~@body
+              (finally
+                (session/release-lock! conn# id#)))))))
 
 
 (defmacro with-transation-lock
   "Sets up a transaction, and executes <body> inside an exclusive transaction-level 
    advisory lock (per <lock-id>), waiting if necessary. Releases the lock at the end 
-   of the transaction (implicitely)."
+   of the transaction (implicitly)."
   [db lock-id & body]
   `(transaction/with-lock ~db (id-from ~lock-id) ~@body))
 
 (defmacro with-transation-try-lock
   "Sets up a transaction, and executes <body> inside an exclusive transaction-level 
    advisory lock (per <lock-id>), if available. Releases the lock at the end 
-   of the transaction (implicitely)."
+   of the transaction (implicitly)."
   [db lock-id & body]
   `(transaction/with-try-lock ~db (id-from ~lock-id) ~@body))
 
 (defmacro with-transation-try-lock-timeout
   "Sets up a transaction, and executes <body> inside an exclusive transaction-level 
    advisory lock (per <lock-id>), waiting up to <timeout-seconds> for one. Releases 
-   the lock at the end of the transaction (implicitely)."
+   the lock at the end of the transaction (implicitly)."
   [db lock-id timeout-seconds & body]
   `(transaction/with-try-lock-timeout ~db (id-from ~lock-id) ~timeout-seconds ~@body))
 
