@@ -3,8 +3,12 @@
             [com.github.jimpil.dblocks.transaction :as transaction]
     ;[com.github.jimpil.dblocks.util        :as util]
             [next.jdbc :as jdbc])
-  (:import  [java.util.concurrent ThreadLocalRandom TimeUnit]
-            [java.util.concurrent.locks Lock]))
+  (:import [java.util.concurrent ThreadLocalRandom TimeUnit]
+           [java.util.concurrent.locks Lock]))
+
+(def ACQUIRE-FAIL :dblocks/failed-to-acquire)
+
+(def connection? (partial instance? java.sql.Connection))
 
 ;; Helper protocol for managing user-provided lock ids. 
 ;; The rules are:
@@ -33,40 +37,55 @@
       (str "Invalid 'id' type: " (type this)))))
   )
 
+(extend-protocol next.jdbc.protocols/Connectable
+  java.sql.Connection
+  (get-connection [this _] this))
+
+(defn session-lock*
+  "Helper for removing the boilerplate from the session macros."
+  ([acquire! db id f]
+   (session-lock* acquire! db id nil f))
+  ([acquire! db id timeout f]
+   (let [id   (id-from id)
+         conn (jdbc/get-connection db)
+         acquired? (if (nil? timeout)
+                     (acquire! conn id)
+                     (acquire! conn id timeout))]
+     (if acquired?
+       (try (f)
+            (finally
+              (if (connection? db)
+                ;; we are enclosed in an outer session (i.e. Connection)
+                ;; don't touch it - just release the lock
+                (session/release-lock! conn id)
+                ;; we are in the session we ourselves opened
+                ;; we can close it (will release all locks)
+                (.close conn))))
+       ACQUIRE-FAIL))))
+
 (defmacro with-session-lock
   "Executes <body> inside an exclusive session-level advisory lock (per <lock-id>), 
-   waiting if necessary. Releases the lock at the end (explicitly)."
+   waiting if necessary. Releases the lock at the end, either explicitly (if already
+   in a session), or by closing the session we opened. Returns whatever <body> returns."
   [db lock-id & body]
-  `(let [id# (id-from ~lock-id)]
-     (with-open [conn# (jdbc/get-connection ~db)]
-       (when (session/acquire-lock! conn# id#)
-         (try ~@body
-              (finally
-                (session/release-lock! conn# id#)))))))
+  `(session-lock* session/acquire-lock! ~db ~lock-id (fn [] ~@body)))
 
 (defmacro with-session-try-lock
   "Executes <body> inside an exclusive session-level advisory lock (per <lock-id>), 
-   if available. Releases the lock at the end (explicitly)."
+   if available. Releases the lock at the end, either explicitly (if already in a session),
+   or by closing the session we opened. Returns whatever <body> returns if the lock is
+   successfully acquired, otherwise returns `:dblocks/failed-to-acquire`."
   [db lock-id & body]
-  `(let [id# (id-from ~lock-id)]
-     (with-open [conn# (jdbc/get-connection ~db)]
-       (when (session/try-acquire-lock! conn# id#)
-         (try ~@body
-              (finally
-                (session/release-lock! conn# id#)))))))
+  `(session-lock* session/try-acquire-lock! ~db ~lock-id (fn [] ~@body)))
 
 (defmacro with-session-try-lock-timeout
   "Executes <body> inside an exclusive session-level advisory lock (per <lock-id>), 
-   waiting up to <timeout> seconds. Releases the lock at the end (explicitly)."
+   waiting up to <timeout> seconds. Releases the lock at the end, either explicitly
+   (if already in a session), or by closing the session we opened. Returns whatever <body>
+   returns if the lock is successfully acquired, otherwise returns `:dblocks/failed-to-acquire`."
   [db lock-id timeout & body]
-  `(let [id# (id-from ~lock-id)]
-     (with-open [conn# (jdbc/get-connection ~db)]
-       (when (session/try-acquire-lock-with-timeout! conn# id# ~timeout)
-         (try ~@body
-              (finally
-                (session/release-lock! conn# id#)))))))
-
-
+  `(session-lock* session/try-acquire-lock-with-timeout! ~db ~lock-id ~timeout (fn [] ~@body)))
+;;-----------------------------------------------------------------------------------------------
 (defmacro with-transation-lock
   "Sets up a transaction, and executes <body> inside an exclusive transaction-level 
    advisory lock (per <lock-id>), waiting if necessary. Releases the lock at the end 

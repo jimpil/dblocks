@@ -22,8 +22,7 @@
   [db id]
   (-> db
       (jdbc/execute-one! [ACQUIRE-LOCK id])
-      :lock
-      boolean))
+      :lock))
 
 (defn try-acquire-lock!
   [db id]
@@ -42,8 +41,7 @@
   [db id]
   (-> db
       (jdbc/execute-one! [RELEASE-LOCK id])
-      :unlock
-      boolean))
+      :unlock))
 
 (defn lock-acquired?
   [db id]
