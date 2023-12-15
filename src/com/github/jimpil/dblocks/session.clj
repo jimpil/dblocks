@@ -1,6 +1,8 @@
 (ns com.github.jimpil.dblocks.session
   (:require [clojure.java.io :as io]
-            [next.jdbc :as jdbc]))
+            [next.jdbc :as jdbc]
+            [com.github.jimpil.dblocks.id :as id])
+  (:import (java.sql Connection)))
 
 (def GET-LOCKS        "SELECT * FROM pg_locks WHERE locktype = 'advisory'")
 (def GET-LOCK         (str GET-LOCKS " AND  objid = ?"))
@@ -58,3 +60,30 @@
   "Returns all current advisory session locks."
   [db]
   (jdbc/execute! db [GET-LOCKS]))
+
+(extend-protocol next.jdbc.protocols/Connectable
+  Connection
+  (get-connection [this _] this))
+
+(defn lock*
+  "Helper for correctly using one of the three
+   'acquire' variants above."
+  ([acquire! db id f]
+   (lock* acquire! db id nil f))
+  ([acquire! db id timeout f]
+   (let [id   (id/from id)
+         conn (jdbc/get-connection db)
+         acquired? (if (nil? timeout)
+                     (acquire! conn id)
+                     (acquire! conn id timeout))]
+     (if acquired?
+       (try (f)
+            (finally
+              (if (instance? Connection db)
+                ;; we are enclosed in an outer session (i.e. Connection)
+                ;; don't touch it - just release the lock
+                (release-lock! conn id)
+                ;; we are in the session we ourselves opened
+                ;; we can close it (will release all locks)
+                (.close conn))))
+       :dblocks/failed-to-acquire))))

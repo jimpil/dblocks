@@ -33,18 +33,21 @@
 (defmacro with-lock
   [db id & body]
   `(jdbc/with-transaction [conn# ~db]
-     (when (acquire-lock! conn# ~id)
-       ~@body)))
+     (if (acquire-lock! conn# ~id)
+       (do ~@body)
+       :dblocks/failed-to-acquire)))
 
 (defmacro with-try-lock
   [db id & body]
   `(jdbc/with-transaction [conn# ~db]
-     (when (try-acquire-lock! conn# ~id)
-       ~@body)))
+     (if (try-acquire-lock! conn# ~id)
+       (do ~@body)
+       :dblocks/failed-to-acquire)))
 
 (defmacro with-try-lock-timeout
   [db id timeout-sec & body]
   `(jdbc/with-transaction [conn# ~db]
-     (jdbc/execute-one! conn# ["SET LOCAL lock_timeout = ?" (str ~timeout-sec \s)])
-     (when (try-acquire-lock! conn# ~id)
-       ~@body)))
+     (jdbc/execute-one! conn# ["SELECT set_config('lock_timeout', ?, FALSE);" (str ~timeout-sec \s)])
+     (if (try-acquire-lock! conn# ~id)
+       (do ~@body)
+       :dblocks/failed-to-acquire)))
