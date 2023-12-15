@@ -6,6 +6,7 @@
   (:import [java.util.concurrent TimeUnit]
            [java.util.concurrent.locks Lock]))
 
+;---------------<SESSION SCOPED>----------------
 (defmacro with-session-lock
   "Executes <body> inside an exclusive session-level advisory lock (per <lock-id>), 
    waiting if necessary. Releases the lock at the end, either explicitly (if already
@@ -28,7 +29,8 @@
    returns if the lock is successfully acquired, otherwise returns `:dblocks/failed-to-acquire`."
   [db lock-id timeout & body]
   `(session/lock* session/try-acquire-lock-with-timeout! ~db ~lock-id ~timeout (fn [] ~@body)))
-;;-----------------------------------------------------------------------------------------------
+
+;---------------<TRANSACTION SCOPED>----------------
 (defmacro with-transaction-lock
   "Sets up a transaction, and executes <body> inside an exclusive transaction-level 
    advisory lock (per <lock-id>), waiting if necessary. Releases the lock at the end 
