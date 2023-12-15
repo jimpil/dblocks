@@ -29,21 +29,21 @@
   [db lock-id timeout & body]
   `(session/lock* session/try-acquire-lock-with-timeout! ~db ~lock-id ~timeout (fn [] ~@body)))
 ;;-----------------------------------------------------------------------------------------------
-(defmacro with-transation-lock
+(defmacro with-transaction-lock
   "Sets up a transaction, and executes <body> inside an exclusive transaction-level 
    advisory lock (per <lock-id>), waiting if necessary. Releases the lock at the end 
    of the transaction (implicitly)."
   [db lock-id & body]
   `(transaction/with-lock ~db (id/from ~lock-id) ~@body))
 
-(defmacro with-transation-try-lock
+(defmacro with-transaction-try-lock
   "Sets up a transaction, and executes <body> inside an exclusive transaction-level 
    advisory lock (per <lock-id>), if available. Releases the lock at the end 
    of the transaction (implicitly)."
   [db lock-id & body]
   `(transaction/with-try-lock ~db (id/from ~lock-id) ~@body))
 
-(defmacro with-transation-try-lock-timeout
+(defmacro with-transaction-try-lock-timeout
   "Sets up a transaction, and executes <body> inside an exclusive transaction-level 
    advisory lock (per <lock-id>), waiting up to <timeout-seconds> for one. Releases 
    the lock at the end of the transaction (implicitly)."

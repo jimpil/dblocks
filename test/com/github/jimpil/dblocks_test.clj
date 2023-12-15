@@ -14,7 +14,7 @@
       (let [state (volatile! [])
             id 123]
         (future (with-session-lock DB id (println "affecting-1") (Thread/sleep 500) (vswap! state conj 1)))
-        (Thread/sleep 10) ;; ensure the above future runs before the below
+        (Thread/sleep 50) ;; give the future a chance to start
         (with-session-lock DB id (println "affecting-2") (vswap! state conj 2))
         (is (= [1 2] @state))))
 
@@ -22,7 +22,7 @@
       (let [state (volatile! [])
             id 1234]
         (future (with-session-try-lock DB id (println "affecting-1") (Thread/sleep 500) (vswap! state conj 1)))
-        (Thread/sleep 10)
+        (Thread/sleep 50) ;; give the future a chance to start
         (is
           (= :dblocks/failed-to-acquire
              (with-session-try-lock DB id (println "affecting-2") (vswap! state conj 2)))) ;; no print
@@ -33,11 +33,11 @@
       (let [state (volatile! [])
             id 12345]
         (future (with-session-try-lock DB id (println "affecting-1") (Thread/sleep 1500) (vswap! state conj 1)))
-        (Thread/sleep 10)
+        (Thread/sleep 50) ;; give the future a chance to start
         (is
           (= :dblocks/failed-to-acquire
              (with-session-try-lock-timeout DB id 1 (println "affecting-2") (vswap! state conj 2)))) ;; no print
-        (Thread/sleep 1600)
+        (Thread/sleep 600)
         (is (= [1] @state))))
     )
   )
@@ -47,31 +47,31 @@
     (testing "ACQUIRE FROM 2 TRANSACTIONS"
       (let [state (volatile! [])
             id 123]
-        (future (with-transation-lock DB id (println "affecting-1") (Thread/sleep 500) (vswap! state conj 1)))
-        (Thread/sleep 10)
-        (with-session-lock DB id (println "affecting-2") (vswap! state conj 2))
+        (future (with-transaction-lock DB id (println "affecting-1") (Thread/sleep 500) (vswap! state conj 1)))
+        (Thread/sleep 50) ;; give the future a chance to start
+        (with-transaction-lock DB id (println "affecting-2") (vswap! state conj 2))
         (is (= [1 2] @state))))
 
-    (testing "TRY ACQUIRE FROM 2 CONNECTIONS"
+    (testing "TRY ACQUIRE FROM 2 TRANSACTIONS"
       (let [state (volatile! [])
             id 1234]
-        (future (with-transation-try-lock DB id (println "affecting-1") (Thread/sleep 500) (vswap! state conj 1)))
-        (Thread/sleep 10)
+        (future (with-transaction-try-lock DB id (println "affecting-1") (Thread/sleep 500) (vswap! state conj 1)))
+        (Thread/sleep 50) ;; give the future a chance to start
         (is
           (= :dblocks/failed-to-acquire
-             (with-transation-try-lock DB id (println "affecting-2") (vswap! state conj 2))))
+             (with-transaction-try-lock DB id (println "affecting-2") (vswap! state conj 2))))
         (Thread/sleep 600)
         (is (= [1] @state))))
 
-    (testing "TRY ACQUIRE WITH TIMEOUT FROM 2 CONNECTIONS"
+    (testing "TRY ACQUIRE WITH TIMEOUT FROM 2 TRANSACTIONS"
       (let [state (volatile! [])
             id 12345]
-        (future (with-session-try-lock DB id (println "affecting-1") (Thread/sleep 1500) (vswap! state conj 1)))
-        (Thread/sleep 10)
+        (future (with-transaction-try-lock DB id (println "affecting-1") (Thread/sleep 1500) (vswap! state conj 1)))
+        (Thread/sleep 50) ;; give the future a chance to start
         (is
           (= :dblocks/failed-to-acquire
-             (with-transation-try-lock-timeout DB id 1 (println "affecting-2") (vswap! state conj 2)))) ;; no print
-        (Thread/sleep 1600)
+             (with-transaction-try-lock-timeout DB id 1 (println "affecting-2") (vswap! state conj 2)))) ;; no print
+        (Thread/sleep 600)
         (is (= [1] @state))))
 
     )
