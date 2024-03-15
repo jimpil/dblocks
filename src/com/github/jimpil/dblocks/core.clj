@@ -54,11 +54,14 @@
 
 (defn pg-session-lock
   "Returns an implementation of `java.util.concurrent.locks.Lock` 
-   based on a POSTGRES session advisory lock (per <lock-id>)."
-  ^Lock [db lock-id]
+   based on a POSTGRES session advisory lock (per <lock-id>).
+   The downside is that you will to call this fn on every new connection
+   you open (i.e. can't reuse the returned object)."
+  ^Lock [conn lock-id]
+  {:pre [instance? java.sql.Connection conn]}
   (reify Lock
-    (lock              [_] (session/acquire-lock! db (id/from lock-id)))
-    (^boolean tryLock  [_] (session/try-acquire-lock! db (id/from lock-id)))
+    (lock              [_] (session/acquire-lock! conn (id/from lock-id)))
+    (^boolean tryLock  [_] (session/try-acquire-lock! conn (id/from lock-id)))
     (^boolean tryLock  [_ ^long n ^TimeUnit unit]
-      (session/try-acquire-lock-with-timeout! db (id/from lock-id) (.toSeconds unit n)))
-    (unlock            [_] (session/release-lock! db (id/from lock-id)))))
+      (session/try-acquire-lock-with-timeout! conn (id/from lock-id) (.toSeconds unit n)))
+    (unlock            [_] (session/release-lock! conn (id/from lock-id)))))
