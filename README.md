@@ -10,7 +10,7 @@ Advisory locks are essentially lightweight, general-purpose, **distributed** loc
 in a variety of distributed scenarios (at the application level).
 
 ## Where
-[![Clojars Project](https://clojars.org/com.github.jimpil/dblocks/latest-version.svg)](https://clojars.org/com.github.jimpil/flog)
+[![Clojars Project](https://clojars.org/com.github.jimpil/dblocks/latest-version.svg)](https://clojars.org/com.github.jimpil/dblocks)
 
 
 ## How
